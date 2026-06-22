@@ -23,7 +23,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/jtraderai/jtrader-mcp.git"
+    "url": "git+https://github.com/jtraderai/jtrader-mcp.git"
   },
   "publishConfig": {
     "access": "public",
