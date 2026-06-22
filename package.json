@@ -1,18 +1,34 @@
 {
-  "name": "jtrader-mcp",
-  "version": "1.0.0",
-  "description": "",
+  "name": "@jtrader.ai/mcp",
+  "version": "0.1.0",
+  "description": "JTrader.ai Model Context Protocol (MCP) integration",
   "main": "dist/index.js",
   "bin": {
     "jtrader-mcp": "./dist/index.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "test": "vitest run"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "mcp",
+    "jtrader",
+    "jtrader.ai",
+    "model-context-protocol"
+  ],
+  "author": "jtrader.ai",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jtraderai/jtrader-mcp.git"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "type": "module",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
