@@ -10,7 +10,7 @@ An MCP (Model Context Protocol) server for interacting with [jtrader.ai](https:/
 
 ## Prerequisites
 
-- Node.js (v18 or newer)
+- Node.js (v22 or newer)
 - A Base Mainnet wallet with USDC.
 - An API Key from jtrader.ai OR an Agent Wallet Private Key for SIWX login.
 
@@ -33,8 +33,8 @@ Depending on your goals, you can provide different combinations of the following
   > **⚠️ CRITICAL SECURITY WARNING:** jtrader.ai will **NEVER** ask for, process, transmit, or store your private key. The key never leaves your local machine. It is used exclusively by the MCP server running on your computer to cryptographically sign x402 payment payloads. **Never share your private key.**
 - `JTRADER_API_KEY`: Your persistent API key generated from the jtrader.ai dashboard. This allows the agent to act on behalf of your human account to view reports you have already purchased.
 - `JTRADER_BINDING_TOKEN`: A single-use token to permanently link an autonomous agent's wallet to your human account.
-- `JTRADER_REQUIRE_APPROVAL`: Set to `false` to disable the manual purchase confirmation loop and allow the agent to blindly spend USDC. (Defaults to `true` for safety).
-  > **⚠️ CAUTION:** Disabling approval (`false`) while also disabling the spend limits below gives the AI agent unrestricted access to spend your wallet's USDC balance on reports at its own discretion without human interaction.
+- `JTRADER_REQUIRE_APPROVAL`: Set to `false` to disable the manual purchase confirmation loop and allow the agent to autonomously spend USDC at its own discretion. (Defaults to `true` for safety).
+  > **⚠️ CAUTION:** Disabling approval (`false`) while also disabling the spend limits below gives the AI agent unrestricted access to spend your wallet's USDC balance on reports without human interaction.
 - `JTRADER_MAX_SPEND_LIMIT`: The maximum amount of USDC the agent is allowed to spend on a single report purchase. Set to `-1` or `0` to disable. (Defaults to `5.0`).
 - `JTRADER_MAX_SESSION_SPEND`: The maximum cumulative amount of USDC the agent is allowed to spend during its entire session lifetime. Set to `-1` or `0` to disable for persistent autonomous agents. (Defaults to `20.0`).
 

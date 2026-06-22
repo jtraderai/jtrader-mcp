@@ -90,10 +90,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: 'string',
               description: 'The unique ID of the report to fetch or purchase.',
             },
-            confirm_purchase: {
-              type: 'boolean',
-              description: 'Set this to true ONLY if you have explicitly asked the user for permission to spend USDC and they have approved it.',
-            },
+            ...(REQUIRE_APPROVAL ? {
+              confirm_purchase: {
+                type: 'boolean',
+                description: 'Set this to true ONLY if you have explicitly asked the user for permission to spend USDC and they have approved it.',
+              }
+            } : {})
           },
           required: ['report_id'],
         },
@@ -140,15 +142,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (!report_id) {
           throw new Error('report_id is required');
         }
-        const report = await client.getReport(report_id, confirm_purchase);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(report, null, 2),
-            },
-          ],
-        };
+        const result = await client.getReport(report_id, confirm_purchase);
+        const content: any[] = [];
+        
+        if (result.purchaseDetails) {
+          content.push({
+            type: 'text',
+            text: `[PURCHASE CONFIRMATION] Successfully purchased report ${report_id} for ${result.purchaseDetails.amountPaid.toFixed(2)} USDC. Total session spend is now ${result.purchaseDetails.sessionSpend.toFixed(2)} USDC.`,
+          });
+        }
+        
+        content.push({
+          type: 'text',
+          text: JSON.stringify(result.report, null, 2),
+        });
+
+        return { content };
       }
 
       default:

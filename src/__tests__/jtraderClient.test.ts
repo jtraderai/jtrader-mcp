@@ -18,11 +18,13 @@ vi.mock('@x402/axios', () => {
   return {
     wrapAxiosWithPayment: vi.fn().mockReturnValue({
       get: vi.fn(),
+      interceptors: { response: { use: vi.fn() } }
     }),
     x402Client: class MockX402Client {
       register = vi.fn();
       registerPolicy = mockRegisterPolicy;
       onAfterPaymentCreation = mockOnAfterPaymentCreation;
+      onPaymentResponse = vi.fn();
     },
   };
 });
@@ -98,20 +100,73 @@ describe('JTraderClient', () => {
   });
 
   describe('Report Fetching', () => {
-    it('should throw an explicit error if requireApproval is true and 402 is returned on getReport', async () => {
+    it('should return wrapped report if fetch succeeds without payment', async () => {
+      const client = new JTraderClient({ apiKey: 'jtr_live_123' });
+      const reportData = { id: 'report-1', content: 'Premium content' };
+      const mockBaseAxiosGet = vi.fn().mockResolvedValue({
+        data: reportData,
+      });
+      // @ts-ignore
+      client.baseAxios = { get: mockBaseAxiosGet };
+
+      const res = await client.getReport('report-1');
+      expect(res).toEqual({ report: reportData });
+    });
+
+    it('should throw an explicit error if requireApproval is true and 402 is returned on getReport, extracting price if header is present', async () => {
       const client = new JTraderClient({
         walletPrivateKey: MOCK_PRIVATE_KEY,
         requireApproval: true,
       });
 
-      // We must mock the baseAxios which is used for the non-approved path
+      // 402 with base64 encoded requirements containing accepts[0].amount = 5000000 (5 USDC)
+      const mockPaymentRequired = {
+        accepts: [
+          { amount: '5000000' }
+        ]
+      };
+      const encodedHeader = Buffer.from(JSON.stringify(mockPaymentRequired)).toString('base64');
+
       const mockBaseAxiosGet = vi.fn().mockRejectedValue({
-        response: { status: 402 }
+        response: {
+          status: 402,
+          headers: {
+            'payment-required': encodedHeader
+          }
+        }
       });
       // @ts-ignore - reaching into private for test
       client.baseAxios = { get: mockBaseAxiosGet, interceptors: { request: { use: vi.fn() } } };
 
-      await expect(client.getReport('report-1')).rejects.toThrow(/\[ACTION REQUIRED\] Report is locked and requires an x402 USDC payment/);
+      await expect(client.getReport('report-1')).rejects.toThrow(/\[ACTION REQUIRED\] Report is locked and requires an x402 USDC payment\.\nPrice: 5\.00 USDC/);
+    });
+
+    it('should return purchaseDetails when lastPaymentAmount is populated', async () => {
+      const client = new JTraderClient({
+        walletPrivateKey: MOCK_PRIVATE_KEY,
+        requireApproval: false,
+      });
+
+      const reportData = { id: 'report-1', content: 'Premium content' };
+      const mockPaymentAxiosGet = vi.fn().mockImplementation(() => {
+        // Simulate the onAfterPaymentCreation hook setting the payment amount during execution
+        // @ts-ignore
+        client.lastPaymentAmount = 5.0;
+        // @ts-ignore
+        client.sessionSpend = 5000000n;
+        return Promise.resolve({ data: reportData });
+      });
+      // @ts-ignore
+      client.paymentAxios = { get: mockPaymentAxiosGet };
+
+      const res = await client.getReport('report-1');
+      expect(res).toEqual({
+        report: reportData,
+        purchaseDetails: {
+          amountPaid: 5.0,
+          sessionSpend: 5.0
+        }
+      });
     });
 
     it('should throw an error if 402 is returned but no wallet private key is configured', async () => {
@@ -121,9 +176,44 @@ describe('JTraderClient', () => {
         response: { status: 402 }
       });
       // @ts-ignore
-      client.baseAxios = { get: mockBaseAxiosGet, interceptors: { request: { use: vi.fn() } } };
+      client.baseAxios = { get: mockBaseAxiosGet, interceptors: { request: { use: vi.fn() }, response: { use: vi.fn() } } };
 
       await expect(client.getReport('report1')).rejects.toThrow('JTRADER_WALLET_PRIVATE_KEY is required to authorize x402 payments.');
+    });
+  });
+
+  describe('Authentication', () => {
+    it('should retry a 401 response and re-authenticate via SIWX', async () => {
+      const client = new JTraderClient({
+        walletPrivateKey: MOCK_PRIVATE_KEY,
+      });
+
+      // Mock performSiwxLogin
+      const performSiwxLoginSpy = vi.spyOn(client as any, 'performSiwxLogin').mockResolvedValue(undefined);
+
+      // We simulate an error from an axios interceptor when a request returns 401
+      const mockRequestConfig = { _retry: false, headers: {} };
+      const mockError = {
+        config: mockRequestConfig,
+        response: { status: 401 }
+      };
+
+      // Extract the response interceptor handler that was registered
+      // @ts-ignore
+      const interceptorHandlers = client.baseAxios.interceptors.response.handlers;
+      // Depending on axios version/mock, it's either an array or mock calls.
+      // Since baseAxios is created via real axios.create() in the constructor, we can access handlers.
+      const rejectedHandler = interceptorHandlers![0].rejected!;
+
+      // Use a mock adapter so the retried request doesn't hit the network
+      // @ts-ignore
+      mockRequestConfig.adapter = vi.fn().mockResolvedValue({ data: 'retried response' });
+
+      const retryResult = await rejectedHandler!(mockError);
+
+      expect(performSiwxLoginSpy).toHaveBeenCalled();
+      expect(mockRequestConfig._retry).toBe(true);
+      expect(retryResult.data).toBe('retried response');
     });
   });
 

@@ -22,6 +22,7 @@ export class JTraderClient {
   private paymentAxios?: AxiosInstance;
   private jwtToken?: string;
   private sessionSpend: bigint = 0n;
+  private lastPaymentAmount: number | null = null;
 
   constructor(private config: JTraderClientConfig) {
     this.baseAxios = axios.create({
@@ -66,7 +67,9 @@ export class JTraderClient {
       });
 
       paymentClient.onAfterPaymentCreation(async (ctx) => {
-        this.sessionSpend += BigInt(ctx.selectedRequirements.amount);
+        const amount = BigInt(ctx.selectedRequirements.amount);
+        this.sessionSpend += amount;
+        this.lastPaymentAmount = Number(amount) / 1_000_000;
       });
       paymentClient.onPaymentResponse(async (ctx) => {
         if (ctx.error) {
@@ -87,6 +90,49 @@ export class JTraderClient {
           'Content-Type': 'application/json',
         },
       }), paymentClient);
+    }
+
+    this.setupInterceptors();
+  }
+
+  private setupInterceptors() {
+    const setupAuthRetry = (axiosInstance: AxiosInstance) => {
+      axiosInstance.interceptors.response.use(
+        (response) => response,
+        async (error) => {
+          const originalRequest = error.config;
+          
+          if (
+            error.response &&
+            error.response.status === 401 &&
+            !originalRequest._retry &&
+            this.config.walletPrivateKey &&
+            !this.config.apiKey &&
+            !originalRequest.url?.includes('/agents/auth/')
+          ) {
+            originalRequest._retry = true;
+            try {
+              console.error('[Auth] SIWX JWT token expired or invalid. Re-authenticating...');
+              await this.performSiwxLogin();
+              
+              // Update the authorization header
+              originalRequest.headers['Authorization'] = this.getAuthHeader();
+              
+              // Retry the request
+              return axiosInstance(originalRequest);
+            } catch (loginError) {
+              console.error('[Auth] Failed to re-authenticate via SIWX:', loginError);
+              return Promise.reject(error); // Return original error
+            }
+          }
+          return Promise.reject(error);
+        }
+      );
+    };
+
+    setupAuthRetry(this.baseAxios);
+    if (this.paymentAxios) {
+      setupAuthRetry(this.paymentAxios);
     }
   }
 
@@ -169,6 +215,9 @@ export class JTraderClient {
     const usePaymentAxios = (confirmPurchase || !this.config.requireApproval) && this.paymentAxios;
     const client = usePaymentAxios ? this.paymentAxios! : this.baseAxios;
 
+    // Reset last payment amount before the call
+    this.lastPaymentAmount = null;
+
     try {
       const res = await client.get(`/agents/research/reports/${reportId}`, {
         headers: {
@@ -181,12 +230,43 @@ export class JTraderClient {
         // payment failed (likely verify phase) and the hook didn't throw.
         throw new Error(`[x402] Payment rejected by server (Insufficient funds or invalid signature).\nResponse Data: ${JSON.stringify(res.data)}`);
       }
-      return res.data;
+      
+      const result: { report: any; purchaseDetails?: { amountPaid: number; sessionSpend: number } } = {
+        report: res.data,
+      };
+
+      if (this.lastPaymentAmount !== null) {
+        result.purchaseDetails = {
+          amountPaid: this.lastPaymentAmount,
+          sessionSpend: Number(this.sessionSpend) / 1_000_000,
+        };
+        this.lastPaymentAmount = null; // reset
+      }
+
+      return result;
     } catch (err: any) {
       if (err.response && err.response.status === 402 && !usePaymentAxios) {
         if (!this.paymentAxios) {
           throw new Error('JTRADER_WALLET_PRIVATE_KEY is required to authorize x402 payments.');
         }
+
+        let priceMessage = "";
+        const paymentRequiredHeader = err.response.headers?.['payment-required'] || err.response.headers?.['Payment-Required'];
+        if (paymentRequiredHeader) {
+          try {
+            const raw = Buffer.from(paymentRequiredHeader, 'base64').toString('utf-8');
+            const requirements = JSON.parse(raw);
+            const accepts = requirements.accepts || [];
+            if (accepts.length > 0) {
+              const amount = BigInt(accepts[0].amount);
+              const amountUsdc = Number(amount) / 1_000_000;
+              priceMessage = `\nPrice: ${amountUsdc.toFixed(2)} USDC`;
+            }
+          } catch (parseErr) {
+            // Ignore parsing error and fallback
+          }
+        }
+
         let metadataInfo = "";
         try {
           const metaRes = await this.baseAxios.get(`/agents/research/reports/${reportId}/metadata`, {
@@ -197,12 +277,12 @@ export class JTraderClient {
           metadataInfo = "\n(Could not fetch metadata automatically)";
         }
         
-        throw new Error(`[ACTION REQUIRED] Report is locked and requires an x402 USDC payment.
+        throw new Error(`[ACTION REQUIRED] Report is locked and requires an x402 USDC payment.${priceMessage}
 
 CRITICAL LLM INSTRUCTION: 
 1. DO NOT automatically retry this tool call.
 2. You MUST end your turn immediately and wait for human input.
-3. Present the metadata below to the user and explicitly ask if they approve the purchase.
+3. Present the price and metadata below to the user and explicitly ask if they approve the purchase.
 4. Only AFTER the user replies with their approval, you may call this tool again with confirm_purchase: true.
 ${metadataInfo}`);
       }
