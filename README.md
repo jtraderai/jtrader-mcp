@@ -32,7 +32,6 @@ Depending on your goals, you can provide different combinations of the following
 - `JTRADER_WALLET_PRIVATE_KEY`: The 32-byte private key of an Ethereum wallet. **This is required if you want your agent to make purchases.** The wallet must be funded with USDC on the Base network to authorize x402 micropayments.
   > **⚠️ CRITICAL SECURITY WARNING:** jtrader.ai will **NEVER** ask for, process, transmit, or store your private key. The key never leaves your local machine. It is used exclusively by the MCP server running on your computer to cryptographically sign x402 payment payloads. **Never share your private key.**
 - `JTRADER_API_KEY`: Your persistent API key generated from the jtrader.ai dashboard. This allows the agent to act on behalf of your human account to view reports you have already purchased.
-- `JTRADER_BINDING_TOKEN`: A single-use token to permanently link an autonomous agent's wallet to your human account.
 - `JTRADER_REQUIRE_APPROVAL`: Set to `false` to disable the manual purchase confirmation loop. (Defaults to `true` for safety).
 - `JTRADER_MAX_SPEND_LIMIT`: The maximum amount of USDC the agent is allowed to spend on a single report purchase. Set to `-1` or `0` to disable. (Defaults to `5.0`).
 - `JTRADER_MAX_SESSION_SPEND`: The maximum cumulative amount of USDC the agent is allowed to spend during its entire session lifetime. (Defaults to `20.0`).
@@ -99,6 +98,7 @@ To use this server with Google Antigravity, add the configuration to your global
 - `list_reports(limit?: number)`: Retrieve a list of reports. Use `limit: 1` to quickly get the latest report's metadata.
 - `get_report_metadata(report_id: string)`: Inspect a locked report's metadata (including its objective and catalysts) without paying.
 - `get_report(report_id: string)`: Purchase and fetch the full contents of a specific report. If the report requires payment, the server will automatically authorize the x402 payment using the agent's wallet.
+- `bind_account(binding_token: string)`: Bind the autonomous agent's wallet to a human user account using a one-time binding token.
 
 ## Debugging the Server
 

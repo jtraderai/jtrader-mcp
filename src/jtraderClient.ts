@@ -198,6 +198,19 @@ export class JTraderClient {
 
     const loginRes = await this.baseAxios.post('/agents/auth/siwx-login', payload);
     this.jwtToken = loginRes.data.token;
+    
+    // Clear the binding token after a successful login so it isn't sent again on token refresh.
+    if (this.config.bindingToken) {
+      delete this.config.bindingToken;
+    }
+  }
+
+  async bindAccount(token: string) {
+    if (!this.config.walletPrivateKey) {
+      throw new Error('JTRADER_WALLET_PRIVATE_KEY is required to bind an autonomous agent account.');
+    }
+    this.config.bindingToken = token;
+    await this.performSiwxLogin();
   }
 
   // --- API Endpoints ---
