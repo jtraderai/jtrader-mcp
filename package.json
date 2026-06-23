@@ -1,6 +1,6 @@
 {
   "name": "@jtrader.ai/mcp",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "JTrader.ai Model Context Protocol (MCP) integration",
   "main": "dist/index.js",
   "bin": {
