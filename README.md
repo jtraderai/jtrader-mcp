@@ -1,6 +1,6 @@
 # jtrader-mcp
 
-An MCP (Model Context Protocol) server for interacting with [jtrader.ai](https://jtrader.ai), providing AI agents with the ability to fetch research reports and autonomously execute x402 USDC micropayments to purchase premium insights.
+The jtrader [Model Context Protocol](https://modelcontextprotocol.com/) server allows AI agents to interact with [jtrader.ai](https://jtrader.ai). This protocol supports various tools to fetch research reports and autonomously execute x402 USDC micropayments to purchase market reports.
 
 ## Features
 
@@ -14,55 +14,76 @@ An MCP (Model Context Protocol) server for interacting with [jtrader.ai](https:/
 - A Base Mainnet wallet with USDC.
 - An API Key from jtrader.ai OR an Agent Wallet Private Key for SIWX login.
 
-## Installation
+## Local
+
+To run the jtrader MCP server locally using `npx`, use the following command:
 
 ```bash
-npm install
-npm run build
+# Basic usage
+npx -y @jtrader.ai/mcp
 ```
 
-## Configuration
-
-This MCP server requires environment variables to function correctly. You can configure these in your MCP client's configuration file.
+This server requires environment variables to function correctly. You can configure these in your MCP client's configuration file or pass them directly in your environment.
 
 ### Environment Variables Explained
 
 Depending on your goals, you can provide different combinations of the following keys:
 
-- `JTRADER_WALLET_PRIVATE_KEY`: The 32-byte private key of an Ethereum wallet (can be provided with or without a `0x` prefix). **This is required if you want your agent to make purchases.** The wallet must be funded with USDC on the Base network to authorize x402 micropayments.
+- `JTRADER_WALLET_PRIVATE_KEY`: The 32-byte private key of an Ethereum wallet. **This is required if you want your agent to make purchases.** The wallet must be funded with USDC on the Base network to authorize x402 micropayments.
   > **⚠️ CRITICAL SECURITY WARNING:** jtrader.ai will **NEVER** ask for, process, transmit, or store your private key. The key never leaves your local machine. It is used exclusively by the MCP server running on your computer to cryptographically sign x402 payment payloads. **Never share your private key.**
 - `JTRADER_API_KEY`: Your persistent API key generated from the jtrader.ai dashboard. This allows the agent to act on behalf of your human account to view reports you have already purchased.
 - `JTRADER_BINDING_TOKEN`: A single-use token to permanently link an autonomous agent's wallet to your human account.
-- `JTRADER_REQUIRE_APPROVAL`: Set to `false` to disable the manual purchase confirmation loop and allow the agent to autonomously spend USDC at its own discretion. (Defaults to `true` for safety).
-  > **⚠️ CAUTION:** Disabling approval (`false`) while also disabling the spend limits below gives the AI agent unrestricted access to spend your wallet's USDC balance on reports without human interaction.
+- `JTRADER_REQUIRE_APPROVAL`: Set to `false` to disable the manual purchase confirmation loop. (Defaults to `true` for safety).
 - `JTRADER_MAX_SPEND_LIMIT`: The maximum amount of USDC the agent is allowed to spend on a single report purchase. Set to `-1` or `0` to disable. (Defaults to `5.0`).
-- `JTRADER_MAX_SESSION_SPEND`: The maximum cumulative amount of USDC the agent is allowed to spend during its entire session lifetime. Set to `-1` or `0` to disable for persistent autonomous agents. (Defaults to `20.0`).
+- `JTRADER_MAX_SESSION_SPEND`: The maximum cumulative amount of USDC the agent is allowed to spend during its entire session lifetime. (Defaults to `20.0`).
 
-### Common Configurations
+## Usage with Claude Desktop
 
-**1. Full Access (Recommended)**
-Provide **both** `JTRADER_API_KEY` and `JTRADER_WALLET_PRIVATE_KEY`. 
-The agent will read reports on behalf of your human account (via the API key), and it will automatically execute x402 purchases using the wallet. Any purchases the agent makes will be permanently tied to your human account. *(A binding token is not needed in this configuration).*
-
-**2. Autonomous Agent (No API Key)**
-Provide **only** `JTRADER_WALLET_PRIVATE_KEY`. 
-The agent will log in via SIWX (Sign-In with X) and act as a completely independent entity. [SIWX](https://docs.x402.org/extensions/sign-in-with-x) is a decentralized authentication standard that allows the agent to securely prove ownership of its wallet address to jtrader.ai without passwords. It will buy and read reports using its own wallet. If you want its purchases to show up in your human dashboard, you can optionally provide a `JTRADER_BINDING_TOKEN` during its first run.
-
-**3. Read-Only (No Wallet)**
-Provide **only** `JTRADER_API_KEY`. 
-The agent can read reports you have already bought, but it **cannot** purchase new reports (since it lacks a wallet to sign the payment transaction).
-
-## Usage with MCP Clients
-
-To install this server, add the following to your MCP client's configuration file:
+Add the following to your `claude_desktop_config.json`. See [here](https://modelcontextprotocol.io/quickstart/user) for more details.
 
 ```json
 {
   "mcpServers": {
     "jtrader": {
-      "command": "node",
+      "command": "npx",
       "args": [
-        "/absolute/path/to/jtrader-mcp/dist/index.js"
+        "-y",
+        "@jtrader.ai/mcp"
+      ],
+      "env": {
+        "JTRADER_API_KEY": "jtr_live_...",
+        "JTRADER_WALLET_PRIVATE_KEY": "0xYourAgentPrivateKeyHere"
+      }
+    }
+  }
+}
+```
+
+## Usage with Cursor
+
+Cursor supports standard MCP configuration. You can configure it directly through the UI. For the most up-to-date instructions, please see the [Cursor MCP Documentation](https://cursor.com/docs/mcp#installing-mcp-servers).
+
+1. Open **Cursor Settings**
+2. Navigate to **Features** > **MCP**
+3. Click **+ Add New MCP Server**
+4. Set the Name to `jtrader`
+5. Set the Type to `command`
+6. Set the Command to `npx -y @jtrader.ai/mcp`
+
+*Note: Environment variables for Cursor MCP servers are inherited from the environment Cursor was launched in. You can also specify them in a `.env` file depending on your setup.*
+
+## Usage with Antigravity CLI
+
+To use this server with Google Antigravity, add the configuration to your global `mcp_config.json` (typically located in `~/.gemini/config/mcp_config.json` on Windows/Linux or `~/.config/gemini/mcp_config.json` on Mac). For the most up-to-date instructions, please see the [Antigravity MCP Documentation](https://antigravity.google/docs/mcp):
+
+```json
+{
+  "mcpServers": {
+    "jtrader": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@jtrader.ai/mcp"
       ],
       "env": {
         "JTRADER_API_KEY": "jtr_live_...",
@@ -79,12 +100,25 @@ To install this server, add the following to your MCP client's configuration fil
 - `get_report_metadata(report_id: string)`: Inspect a locked report's metadata (including its objective and catalysts) without paying.
 - `get_report(report_id: string)`: Purchase and fetch the full contents of a specific report. If the report requires payment, the server will automatically authorize the x402 payment using the agent's wallet.
 
-## Development
+## Debugging the Server
+
+To debug your server, you can use the [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector).
+
+First, build the server:
 
 ```bash
-# Run tests
-npm run test
-
-# Watch for changes and build
-npm run build -- --watch
+npm run build
 ```
+
+Then run the following command in your terminal:
+
+```bash
+# Start MCP Inspector and server
+npx @modelcontextprotocol/inspector node dist/index.js
+```
+
+### Instructions
+
+1. Run the command to start the MCP Inspector.
+2. Open the MCP Inspector UI in your browser and click Connect to start the MCP server.
+3. You can see the list of tools and test each tool individually.
