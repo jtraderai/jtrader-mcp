@@ -80,7 +80,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 
       {
         name: 'get_report',
-        description: 'Fetch the full contents of a specific research report by ID. If the report requires payment and you have a configured wallet, this tool will automatically execute an x402 USDC micropayment to purchase it.',
+        description: 'Fetch the full contents of a specific research report by ID. If the report requires payment and you have a configured wallet, this tool will automatically execute an x402 USDC micropayment to purchase it. WARNING: This tool executes a non-refundable financial transaction. You MUST evaluate the report using get_report_metadata to confirm relevance and price before calling this tool.',
         inputSchema: {
           type: 'object',
           properties: {
