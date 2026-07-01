@@ -1,6 +1,6 @@
 # jtrader-mcp
 
-The jtrader [Model Context Protocol](https://modelcontextprotocol.com/) server allows AI agents to interact with [jtrader.ai](https://jtrader.ai). This protocol supports various tools to fetch research reports and autonomously execute x402 USDC micropayments to purchase market reports.
+The jtrader [Model Context Protocol](https://modelcontextprotocol.com/) server allows AI agents to interact with [JTrader.ai](https://jtrader.ai). This protocol supports various tools to fetch research reports and autonomously execute x402 USDC micropayments to purchase market reports.
 
 ## Features
 
